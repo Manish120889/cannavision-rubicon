@@ -1,32 +1,62 @@
-# React + TypeScript + Vite
+# CannaVision AI - Rubicon Organics Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+[![Public Web App](https://img.shields.io/badge/Public_Web_App-Live_24/7-10b981?style=for-the-badge&logo=react)](https://manish120889.github.io/cannavision-rubicon/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-cannavision--rubicon-181717?style=for-the-badge&logo=github)](https://github.com/Manish120889/cannavision-rubicon.git)
 
-Currently, two official plugins are available:
+Enterprise plant-health intelligence platform specifically built for **Rubicon Organics** (Pacifica Facility in Delta, BC) matching FVOPA Organic & GACP standards.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🌐 Public Access & Links
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+* **GitHub Repository**: [https://github.com/Manish120889/cannavision-rubicon.git](https://github.com/Manish120889/cannavision-rubicon.git)
+* **24/7 Public Live Web App**: [https://manish120889.github.io/cannavision-rubicon/](https://manish120889.github.io/cannavision-rubicon/)
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 💻 1-Click Public Website Hosting Setup
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+### Option A: Free Vercel / Netlify 24/7 Hosting (Recommended)
+1. Log into [Vercel](https://vercel.com) or [Netlify](https://netlify.com).
+2. Click **"Import Git Repository"** and select `Manish120889/cannavision-rubicon`.
+3. Vercel/Netlify will automatically build and deploy it 24/7 with free SSL HTTPS certificates on your custom domain (`cannavision.rubiconorganics.com`)!
+
+### Option B: Embed on Your Existing Website (`<iframe>`)
+Add this HTML code to your company website:
+```html
+<iframe 
+  src="https://manish120889.github.io/cannavision-rubicon/" 
+  width="100%" 
+  height="900px" 
+  style="border: none; border-radius: 12px;"
+  allow="camera; microphone; autoplay"
+></iframe>
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## 🚀 Local Development & Platform Variant Builds
+
+### 1. Web Local Development
+```bash
+npm install
+npm run dev
+```
+
+### 2. Desktop Standalone Executable Build (Windows/macOS)
+```bash
+npm run build:desktop
+# Packaged binary is saved in release/
+```
+
+### 3. Android Mobile APK Build
+```bash
+npx cap add android
+npx cap open android
+```
+
+### 4. iPhone (iOS) Native Mobile Build
+```bash
+npx cap add ios
+npx cap open ios
+```
