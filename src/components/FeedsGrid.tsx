@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { Video } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { Video, Eye, EyeOff, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface FeedsGridProps {
   isLiveCamActive: boolean;
@@ -11,6 +11,11 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
   const feed3Ref = useRef<HTMLCanvasElement | null>(null);
   const feed4Ref = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Gesture-Alike Detection State: Only show bounding boxes when a cannabis plant is detected in frame!
+  const [isPlantDetectedInFrame, setIsPlantDetectedInFrame] = useState<boolean>(true);
+  const [plantConfidenceScore, setPlantConfidenceScore] = useState<number>(98.4);
+  const [autoDetectMode, setAutoDetectMode] = useState<boolean>(false);
 
   // Initialize webcam stream if activated
   useEffect(() => {
@@ -27,12 +32,53 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     }
   }, [isLiveCamActive]);
 
-  // Render procedure for all 4 feeds matching the design image
+  // Real-time camera pixel analyzer for auto-detect mode (Green foliage color histogram)
+  useEffect(() => {
+    if (!isLiveCamActive || !autoDetectMode) return;
+
+    const interval = setInterval(() => {
+      if (videoRef.current && videoRef.current.readyState === 4) {
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = 160;
+        offCanvas.height = 90;
+        const offCtx = offCanvas.getContext('2d');
+        if (offCtx) {
+          offCtx.drawImage(videoRef.current, 0, 0, 160, 90);
+          const imgData = offCtx.getImageData(0, 0, 160, 90);
+          let greenPixels = 0;
+          const total = imgData.data.length / 4;
+
+          for (let i = 0; i < imgData.data.length; i += 4) {
+            const r = imgData.data[i];
+            const g = imgData.data[i + 1];
+            const b = imgData.data[i + 2];
+            // Green foliage ratio logic
+            if (g > 60 && g > r * 1.1 && g > b * 1.1) {
+              greenPixels++;
+            }
+          }
+
+          const ratio = (greenPixels / total) * 100;
+          if (ratio > 8) {
+            setIsPlantDetectedInFrame(true);
+            setPlantConfidenceScore(Math.min(99.9, Math.round(75 + ratio * 2)));
+          } else {
+            setIsPlantDetectedInFrame(false);
+            setPlantConfidenceScore(0);
+          }
+        }
+      }
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isLiveCamActive, autoDetectMode]);
+
+  // Render procedure for all 4 feeds
   useEffect(() => {
     let animId: number;
 
     const renderAllFeeds = () => {
-      // --- FEED 1: RUBICON - ROW 4 / UNIT 12 (Multi-plant Green Bounding Boxes) ---
+      // --- FEED 1: RUBICON - ROW 4 / UNIT 12 ---
       if (feed1Ref.current) {
         const c1 = feed1Ref.current;
         const ctx1 = c1.getContext('2d');
@@ -41,59 +87,76 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
           if (isLiveCamActive && videoRef.current && videoRef.current.readyState === 4) {
             ctx1.drawImage(videoRef.current, 0, 0, c1.width, c1.height);
           } else {
-            drawCanopyBackground(ctx1, c1.width, c1.height);
+            if (isPlantDetectedInFrame) {
+              drawCanopyBackground(ctx1, c1.width, c1.height);
+            } else {
+              drawEmptyBackground(ctx1, c1.width, c1.height, 'Empty Room - Row 4');
+            }
           }
 
-          // Draw 4 Green Healthy Plant Bounding Boxes
-          const greenBoxes = [
-            { label: 'Healthy Plant: 98.4%', x: 30, y: 80, w: 140, h: 120 },
-            { label: 'Healthy Plant: 98.4%', x: 190, y: 50, w: 150, h: 140 },
-            { label: 'Healthy Plant: 98.4%', x: 360, y: 60, w: 140, h: 130 },
-            { label: 'Healthy Plant: 98.4%', x: 200, y: 190, w: 160, h: 130 }
-          ];
-
-          greenBoxes.forEach((b) => drawBoundingBox(ctx1, b.x, b.y, b.w, b.h, b.label, '#10b981', 'rgba(16, 185, 129, 0.9)'));
+          // Gesture-Alike Rule: ONLY draw tracking bounding boxes when plant is detected in frame!
+          if (isPlantDetectedInFrame) {
+            const greenBoxes = [
+              { label: 'Healthy Plant: 98.4%', x: 30, y: 80, w: 140, h: 120 },
+              { label: 'Healthy Plant: 98.4%', x: 190, y: 50, w: 150, h: 140 },
+              { label: 'Healthy Plant: 98.4%', x: 360, y: 60, w: 140, h: 130 },
+              { label: 'Healthy Plant: 98.4%', x: 200, y: 190, w: 160, h: 130 }
+            ];
+            greenBoxes.forEach((b) => drawBoundingBox(ctx1, b.x, b.y, b.w, b.h, b.label, '#10b981', 'rgba(16, 185, 129, 0.9)'));
+          } else {
+            drawSearchingOverlay(ctx1, c1.width, c1.height);
+          }
         }
       }
 
-      // --- FEED 2: POWDERY MILDEW (PM) [HIGH RISK] Red Bounding Boxes ---
+      // --- FEED 2: POWDERY MILDEW (PM) ---
       if (feed2Ref.current) {
         const c2 = feed2Ref.current;
         const ctx2 = c2.getContext('2d');
         if (ctx2) {
           ctx2.clearRect(0, 0, c2.width, c2.height);
-          drawLeafCloseUp(ctx2, c2.width, c2.height, true, false);
-
-          // Draw 1 Outer Green Box + 2 Red Mildew Bounding Boxes
-          drawBoundingBox(ctx2, 40, 40, 520, 300, 'Green Box: 97.9%', '#10b981', 'rgba(16, 185, 129, 0.9)');
-          drawBoundingBox(ctx2, 100, 110, 180, 190, 'Red Box: 91.2%', '#ef4444', 'rgba(239, 68, 68, 0.9)');
-          drawBoundingBox(ctx2, 330, 80, 210, 210, 'POWDERY MILDEW (PM) [HIGH RISK]\nRed Box: 91.2%', '#ef4444', 'rgba(239, 68, 68, 0.9)');
+          if (isPlantDetectedInFrame) {
+            drawLeafCloseUp(ctx2, c2.width, c2.height, true, false);
+            drawBoundingBox(ctx2, 40, 40, 520, 300, 'Green Box: 97.9%', '#10b981', 'rgba(16, 185, 129, 0.9)');
+            drawBoundingBox(ctx2, 100, 110, 180, 190, 'Red Box: 91.2%', '#ef4444', 'rgba(239, 68, 68, 0.9)');
+            drawBoundingBox(ctx2, 330, 80, 210, 210, 'POWDERY MILDEW (PM) [HIGH RISK]\nRed Box: 91.2%', '#ef4444', 'rgba(239, 68, 68, 0.9)');
+          } else {
+            drawEmptyBackground(ctx2, c2.width, c2.height, 'Feed 2 - Standby');
+            drawSearchingOverlay(ctx2, c2.width, c2.height);
+          }
         }
       }
 
-      // --- FEED 3: SPIDER MITE (SM) [EARLY DETECTION] Amber Bounding Box ---
+      // --- FEED 3: SPIDER MITE (SM) ---
       if (feed3Ref.current) {
         const c3 = feed3Ref.current;
         const ctx3 = c3.getContext('2d');
         if (ctx3) {
           ctx3.clearRect(0, 0, c3.width, c3.height);
-          drawLeafCloseUp(ctx3, c3.width, c3.height, false, true);
-
-          // Outer Green Box + 1 Amber Spider Mite Box
-          drawBoundingBox(ctx3, 30, 30, 520, 320, 'Green Box: 96.7%', '#10b981', 'rgba(16, 185, 129, 0.9)');
-          drawBoundingBox(ctx3, 230, 180, 220, 150, 'SPIDER MITE (SM) [EARLY DETECTION]\nAmber Box: 89.1%', '#f59e0b', 'rgba(245, 158, 11, 0.9)');
+          if (isPlantDetectedInFrame) {
+            drawLeafCloseUp(ctx3, c3.width, c3.height, false, true);
+            drawBoundingBox(ctx3, 30, 30, 520, 320, 'Green Box: 96.7%', '#10b981', 'rgba(16, 185, 129, 0.9)');
+            drawBoundingBox(ctx3, 230, 180, 220, 150, 'SPIDER MITE (SM) [EARLY DETECTION]\nAmber Box: 89.1%', '#f59e0b', 'rgba(245, 158, 11, 0.9)');
+          } else {
+            drawEmptyBackground(ctx3, c3.width, c3.height, 'Feed 3 - Standby');
+            drawSearchingOverlay(ctx3, c3.width, c3.height);
+          }
         }
       }
 
-      // --- FEED 4: Clean Green Foliage & Bud ---
+      // --- FEED 4: Clean Bud ---
       if (feed4Ref.current) {
         const c4 = feed4Ref.current;
         const ctx4 = c4.getContext('2d');
         if (ctx4) {
           ctx4.clearRect(0, 0, c4.width, c4.height);
-          drawLeafCloseUp(ctx4, c4.width, c4.height, false, false);
-
-          drawBoundingBox(ctx4, 40, 40, 500, 300, 'Green Box: 98.2%', '#10b981', 'rgba(16, 185, 129, 0.9)');
+          if (isPlantDetectedInFrame) {
+            drawLeafCloseUp(ctx4, c4.width, c4.height, false, false);
+            drawBoundingBox(ctx4, 40, 40, 500, 300, 'Green Box: 98.2%', '#10b981', 'rgba(16, 185, 129, 0.9)');
+          } else {
+            drawEmptyBackground(ctx4, c4.width, c4.height, 'Feed 4 - Standby');
+            drawSearchingOverlay(ctx4, c4.width, c4.height);
+          }
         }
       }
 
@@ -101,11 +164,10 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     };
 
     renderAllFeeds();
-
     return () => cancelAnimationFrame(animId);
-  }, [isLiveCamActive]);
+  }, [isLiveCamActive, isPlantDetectedInFrame]);
 
-  // Helper: Draw Bounding Box with Label matching design image
+  // Helper: Draw Bounding Box with Label
   const drawBoundingBox = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -120,7 +182,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     ctx.strokeStyle = strokeColor;
     ctx.strokeRect(x, y, w, h);
 
-    // Label Header
     const lines = label.split('\n');
     const labelHeight = lines.length * 18 + 6;
     ctx.fillStyle = fillColor;
@@ -133,12 +194,44 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     });
   };
 
-  // Helper: Draw Procedural Multi-plant Canopy (Feed 1)
+  // Helper: Draw Overlay when no plant is visible in frame (Bounding Boxes Hidden!)
+  const drawSearchingOverlay = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    ctx.fillStyle = 'rgba(6, 15, 24, 0.7)';
+    ctx.fillRect(20, h - 50, w - 40, 36);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeRect(20, h - 50, w - 40, 36);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '600 13px sans-serif';
+    ctx.fillText('🔍 NO CANNABIS PLANT DETECTED IN FRAME — AI TRACKING BOXES INVISIBLE', 35, h - 28);
+  };
+
+  // Helper: Draw Empty Scene Background
+  const drawEmptyBackground = (ctx: CanvasRenderingContext2D, w: number, h: number, label: string) => {
+    ctx.fillStyle = '#060f18';
+    ctx.fillRect(0, 0, w, h);
+
+    // Empty grid lines
+    ctx.strokeStyle = '#101924';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 30) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 30) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    ctx.fillStyle = '#475569';
+    ctx.font = '14px sans-serif';
+    ctx.fillText(label, w / 2 - 60, h / 2);
+  };
+
+  // Helper: Draw Procedural Multi-plant Canopy
   const drawCanopyBackground = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     ctx.fillStyle = '#060f18';
     ctx.fillRect(0, 0, w, h);
 
-    // Grid lines for hydroponic tables
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
     for (let x = 0; x < w; x += 40) {
@@ -148,7 +241,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
 
-    // Draw multiple plant canopies
     const plants = [
       { x: 100, y: 140, r: 60 },
       { x: 260, y: 120, r: 70 },
@@ -162,7 +254,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
 
-      // Flower center
       ctx.fillStyle = '#a7f3d0';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * 0.4, 0, Math.PI * 2);
@@ -170,7 +261,7 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     });
   };
 
-  // Helper: Draw Close-Up Cannabis Leaf with optional Mildew or Mite spots (Feeds 2, 3, 4)
+  // Helper: Draw Close-Up Cannabis Leaf
   const drawLeafCloseUp = (
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -184,7 +275,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     const cx = w / 2;
     const cy = h / 2 + 20;
 
-    // Stem
     ctx.strokeStyle = '#15803d';
     ctx.lineWidth = 12;
     ctx.beginPath();
@@ -192,13 +282,11 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
     ctx.lineTo(cx, cy - 80);
     ctx.stroke();
 
-    // Center Flower Cola
     ctx.fillStyle = '#10b981';
     ctx.beginPath();
     ctx.ellipse(cx, cy - 80, 50, 75, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Fan Leaves
     const leafletAngles = [-60, -35, -15, 0, 15, 35, 60];
     leafletAngles.forEach((angle) => {
       ctx.save();
@@ -213,7 +301,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
       ctx.restore();
     });
 
-    // Powdery Mildew White Spots if Feed 2
     if (hasMildew) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.beginPath();
@@ -222,7 +309,6 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
       ctx.fill();
     }
 
-    // Spider Mite Yellow Stippling if Feed 3
     if (hasMites) {
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
@@ -232,50 +318,100 @@ export const FeedsGrid: React.FC<FeedsGridProps> = ({ isLiveCamActive }) => {
   };
 
   return (
-    <div className="feeds-grid">
-      <video ref={videoRef} style={{ display: 'none' }} playsInline muted />
-
-      {/* FEED 1 */}
-      <div className="feed-card">
-        <div className="feed-header">
-          <span>RUBICON - ROW 4 / UNIT 12</span>
-          <Video size={14} className="feed-cam-icon" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+      {/* Gesture-Alike Plant Detection Mode Control Bar */}
+      <div style={{ background: '#101924', border: '1px solid #1a2838', borderRadius: '10px', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {isPlantDetectedInFrame ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981', fontWeight: 700, fontSize: '0.85rem' }}>
+              <CheckCircle size={18} /> CANNABIS IN FRAME (AI TRACKING ACTIVE: {plantConfidenceScore}%)
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444', fontWeight: 700, fontSize: '0.85rem' }}>
+              <AlertCircle size={18} /> NO CANNABIS IN FRAME (AI BOXES INVISIBLE)
+            </div>
+          )}
         </div>
-        <div className="feed-canvas-container">
-          <canvas ref={feed1Ref} width={600} height={380} className="feed-canvas" />
+
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => { setIsPlantDetectedInFrame(true); setAutoDetectMode(false); }}
+            style={{
+              background: isPlantDetectedInFrame && !autoDetectMode ? '#10b981' : '#1e293b',
+              color: '#ffffff', border: 'none', padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <Eye size={14} /> Plant In Frame
+          </button>
+
+          <button
+            onClick={() => { setIsPlantDetectedInFrame(false); setAutoDetectMode(false); }}
+            style={{
+              background: !isPlantDetectedInFrame && !autoDetectMode ? '#ef4444' : '#1e293b',
+              color: '#ffffff', border: 'none', padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <EyeOff size={14} /> No Plant (Hide Boxes)
+          </button>
+
+          <button
+            onClick={() => setAutoDetectMode(true)}
+            style={{
+              background: autoDetectMode ? '#3b82f6' : '#1e293b',
+              color: '#ffffff', border: 'none', padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <Sparkles size={14} /> Auto Camera Detection
+          </button>
         </div>
       </div>
 
-      {/* FEED 2 */}
-      <div className="feed-card">
-        <div className="feed-header">
-          <span>FEED 2</span>
-          <Video size={14} className="feed-cam-icon" />
-        </div>
-        <div className="feed-canvas-container">
-          <canvas ref={feed2Ref} width={600} height={380} className="feed-canvas" />
-        </div>
-      </div>
+      {/* 2x2 Feeds Grid */}
+      <div className="feeds-grid">
+        <video ref={videoRef} style={{ display: 'none' }} playsInline muted />
 
-      {/* FEED 3 */}
-      <div className="feed-card">
-        <div className="feed-header">
-          <span>FEED 3</span>
-          <Video size={14} className="feed-cam-icon" />
+        {/* FEED 1 */}
+        <div className="feed-card">
+          <div className="feed-header">
+            <span>RUBICON - ROW 4 / UNIT 12</span>
+            <Video size={14} className="feed-cam-icon" />
+          </div>
+          <div className="feed-canvas-container">
+            <canvas ref={feed1Ref} width={600} height={380} className="feed-canvas" />
+          </div>
         </div>
-        <div className="feed-canvas-container">
-          <canvas ref={feed3Ref} width={600} height={380} className="feed-canvas" />
-        </div>
-      </div>
 
-      {/* FEED 4 */}
-      <div className="feed-card">
-        <div className="feed-header">
-          <span>FEED 4</span>
-          <Video size={14} className="feed-cam-icon" />
+        {/* FEED 2 */}
+        <div className="feed-card">
+          <div className="feed-header">
+            <span>FEED 2</span>
+            <Video size={14} className="feed-cam-icon" />
+          </div>
+          <div className="feed-canvas-container">
+            <canvas ref={feed2Ref} width={600} height={380} className="feed-canvas" />
+          </div>
         </div>
-        <div className="feed-canvas-container">
-          <canvas ref={feed4Ref} width={600} height={380} className="feed-canvas" />
+
+        {/* FEED 3 */}
+        <div className="feed-card">
+          <div className="feed-header">
+            <span>FEED 3</span>
+            <Video size={14} className="feed-cam-icon" />
+          </div>
+          <div className="feed-canvas-container">
+            <canvas ref={feed3Ref} width={600} height={380} className="feed-canvas" />
+          </div>
+        </div>
+
+        {/* FEED 4 */}
+        <div className="feed-card">
+          <div className="feed-header">
+            <span>FEED 4</span>
+            <Video size={14} className="feed-cam-icon" />
+          </div>
+          <div className="feed-canvas-container">
+            <canvas ref={feed4Ref} width={600} height={380} className="feed-canvas" />
+          </div>
         </div>
       </div>
     </div>
